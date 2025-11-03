@@ -1,0 +1,45 @@
+/* 🎨 CSS Variables สำหรับ Light / Dark Theme ของ Nuxt UI */
+:root {
+  /* พื้นหลังหลักทั้งแอป (body ใช้ bg-default) */
+  --ui-bg: var(--ui-color-neutral-50);       /* เทาอ่อน ๆ สไตล์ dashboard */
+  --ui-bg-muted: var(--ui-color-neutral-50);
+  --ui-bg-elevated: var(--ui-color-neutral-0, #ffffff);
+  --ui-bg-accented: var(--ui-color-neutral-100);
+  --ui-bg-inverted: var(--ui-color-neutral-900);
+
+  /* สีตัวหนังสือหลัก ๆ */
+  --ui-text-dimmed: var(--ui-color-neutral-400);
+  --ui-text-muted: var(--ui-color-neutral-500);
+  --ui-text-toned: var(--ui-color-neutral-600);
+  --ui-text: var(--ui-color-neutral-800);     /* ตัวหนังสือหลัก */
+  --ui-text-highlighted: var(--ui-color-neutral-900);
+  --ui-text-inverted: #ffffff;
+
+  /* สีเส้นขอบ */
+  --ui-border: var(--ui-color-neutral-200);
+  --ui-border-muted: var(--ui-color-neutral-200);
+  --ui-border-accented: var(--ui-color-neutral-300);
+  --ui-border-inverted: var(--ui-color-neutral-900);
+
+  /* 🎯 ปรับความโค้งมุม global (มีผลกับ rounded-* ทั้งหมด) */
+  --ui-radius: 0.3rem; /* ประมาณ rounded-lg → ฟีล Bootstrap btn/card */
+
+  /* ความกว้าง container มาตรฐาน (ใช้กับ <UContainer>) */
+  --ui-container: var(--container-7xl);
+
+  /* ความสูง header (ถ้าใช้ <UHeader>) */
+  --ui-header-height: --spacing(16);
+}
+
+/* ถ้าจะรองรับ dark mode ทีหลัง ค่อยมา override เพิ่ม */
+.dark {
+  --ui-bg: var(--ui-color-neutral-950);
+  --ui-bg-muted: var(--ui-color-neutral-900);
+  --ui-bg-elevated: var(--ui-color-neutral-900);
+  --ui-bg-accented: var(--ui-color-neutral-800);
+  --ui-bg-inverted: #ffffff;
+
+  --ui-text: var(--ui-color-neutral-100);
+  --ui-text-muted: var(--ui-color-neutral-400);
+  --ui-border: var(--ui-color-neutral-800);
+}

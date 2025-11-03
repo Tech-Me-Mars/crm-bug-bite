@@ -1,0 +1,19 @@
+/* app/assets/css/main.css */
+@import "tailwindcss";
+@import "@nuxt/ui";
+@import "./root_style.css";
+/* ตั้ง design token เพิ่มตามต้องการ */
+@theme {
+  --font-sans: 'Noto Sans Thai', 'Public Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  /* ถ้าอยาก custom font เพิ่มก็ทำตรงนี้ได้ทีหลัง เช่น:
+  --font-sans: "Prompt", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  */
+
+  /* ถ้าจะเพิ่ม container/ breakpoint ก็ทำได้ เช่น:
+  --container-8xl: 90rem;
+  --breakpoint-3xl: 1920px;
+  */
+}
+
