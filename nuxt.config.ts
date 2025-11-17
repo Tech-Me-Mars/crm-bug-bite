@@ -3,7 +3,16 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   runtimeConfig: {
-    cookieSecret: process.env.COOKIE_SECRET,
+    // Private keys (only available server-side)
+    cookieSecret: process.env.COOKIE_SECRET || 'default-secret-key',
+
+    // Public keys (exposed to client)
+    public: {
+      apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:8000/api',
+      apiTimeout: process.env.API_TIMEOUT || '30000',
+      appName: process.env.APP_NAME || 'Bug Bite CRM',
+      appUrl: process.env.APP_URL || 'http://localhost:3000'
+    }
   },
 
   modules: [

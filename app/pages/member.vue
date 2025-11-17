@@ -1,0 +1,203 @@
+<script setup>
+import { ref } from 'vue'
+
+// Disable default layout for this page (we have our own header)
+definePageMeta({
+  layout: false
+})
+
+// Recommended items (พร้อมรับข้อมูลจาก API)
+const recommendedItems = ref([
+  {
+    id: 1,
+    name: 'Crisp Corita Snacks',
+    price: 289,
+    image: '/images/product-01.png'
+  },
+  {
+    id: 2,
+    name: 'Crisp Special Snacks',
+    price: 29,
+    image: '/images/product-02.png'
+  },
+  {
+    id: 3,
+    name: 'Bug Bite Premium Mix',
+    price: 159,
+    image: '/images/product-03.png'
+  },
+  {
+    id: 4,
+    name: 'Deluxe Insect Combo',
+    price: 399,
+    image: '/images/product-04.png'
+  }
+])
+
+// Loading state for API
+const isLoadingRecommended = ref(false)
+
+// Fetch recommended items from API
+const fetchRecommendedItems = async () => {
+  isLoadingRecommended.value = true
+  try {
+    // TODO: Replace with actual API call
+    // const response = await request('GET', '/api/recommended', null, true)
+    // recommendedItems.value = response.data
+
+    // Simulating API call delay
+    await new Promise(resolve => setTimeout(resolve, 500))
+    console.log('Fetched recommended items')
+  } catch (error) {
+    console.error('Error fetching recommended items:', error)
+  } finally {
+    isLoadingRecommended.value = false
+  }
+}
+
+// Fetch on component mount
+onMounted(() => {
+  fetchRecommendedItems()
+})
+
+const handleOrderNow = (item) => {
+  console.log('Order now:', item)
+  // TODO: Add to cart or navigate to product page
+  navigateTo(`/product/${item.id}`)
+}
+</script>
+
+<template>
+  <div class="min-h-screen bg-amber-50">
+    <!-- Bug Bite Header with Hamburger Menu -->
+    <BugBiteHeader />
+
+    <UContainer class="py-6 space-y-6">
+      <!-- Recommended for You -->
+      <div>
+        <!-- Section Header -->
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">รายการแนะนำสำหรับคุณ</h2>
+
+        <!-- Loading State -->
+        <div v-if="isLoadingRecommended" class="flex justify-center py-8">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600" />
+        </div>
+
+        <!-- Horizontal Scroll Container -->
+        <div v-else class="overflow-x-auto scrollbar-hide">
+          <div class="flex gap-4 pb-2">
+            <!-- Product Card -->
+            <div
+              v-for="item in recommendedItems"
+              :key="item.id"
+              class="flex-none w-44"
+            >
+              <div class="bg-white rounded-lg overflow-hidden border border-gray-200 hover:shadow-md transition-all duration-300">
+                <!-- Product Image -->
+                <div class="aspect-square flex items-center justify-center p-2 bg-white">
+                  <img
+                    :src="item.image"
+                    :alt="item.name"
+                    class="max-w-full max-h-full object-contain"
+                  >
+                </div>
+
+                <!-- Product Info -->
+                <div class="p-4">
+                  <!-- Product Name -->
+                  <h3 class="font-semibold text-gray-800 text-sm mb-2 line-clamp-2 min-h-[2.5rem]">
+                    {{ item.name }}
+                  </h3>
+
+                  <!-- Price -->
+                  <div class="flex items-baseline gap-1 mb-3">
+                    <span class="text-lg font-bold text-gray-900">{{ item.price }}</span>
+                    <span class="text-xs text-gray-500">.-</span>
+                  </div>
+
+                  <!-- Order Button -->
+                  <button
+                    class="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-xs font-semibold py-2.5 px-3 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
+                    @click="handleOrderNow(item)"
+                  >
+                    ดูรายการแนะนำ
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Additional Info -->
+      <div class="bg-white rounded-lg shadow-md p-4 mt-8 mb-24">
+        <div class="text-center space-y-2">
+          <p class="text-sm font-medium text-gray-800">Bug Bite - ทอดมันแมลง</p>
+          <p class="text-xs text-gray-500">อาหารทอดแมลงคุณภาพเยี่ยม สด สะอาด ปลอดภัย</p>
+          <div class="flex justify-center gap-4 text-xs text-gray-400">
+            <span>เปิดทุกวัน 10:00 - 20:00</span>
+            <span>•</span>
+            <span>โทร: 02-XXX-XXXX</span>
+          </div>
+        </div>
+      </div>
+
+    </UContainer>
+
+    <!-- Bottom Navigation Footer -->
+    <BugBiteFooter />
+  </div>
+</template>
+
+<style scoped>
+/* Hide scrollbar for horizontal scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Smooth scroll behavior */
+.overflow-x-auto {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Line clamp utility */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Additional responsive styles */
+@media (max-width: 640px) {
+  .grid-cols-3 > button {
+    min-height: 100px;
+  }
+}
+
+/* Smooth animations */
+button {
+  transition: all 0.3s ease;
+}
+
+button:active {
+  transform: scale(0.95);
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+</style>
