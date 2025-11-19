@@ -5,6 +5,7 @@ const config = useRuntimeConfig()
 const api = useApi()
 
 const isMenuOpen = ref(false)
+const isHistoryOpen = ref(false)
 
 const menuItems = [
   { label: 'หน้าแรก', icon: 'i-heroicons-home', route: '/' },
@@ -17,6 +18,15 @@ const memberCups = ref({
   current: 0, // จำนวนแก้วปัจจุบัน (ดึงจาก API)
   target: 10  // เป้าหมาย 10 แก้ว
 })
+
+// Redeem History Data
+const redeemHistory = ref({
+  current_point: '0',
+  total_transactions: 0,
+  transactions: []
+})
+
+const isLoadingHistory = ref(false)
 
 // User ID
 const userId = ref('')
@@ -52,6 +62,27 @@ const fetchMemberCups = async () => {
   }
 }
 
+// Fetch redeem history from API
+const fetchRedeemHistory = async () => {
+  try {
+    if (!userId.value) return
+
+    isLoadingHistory.value = true
+
+    const response = await api.post('/crmbugbite/v1/redeem/history', {
+      userId: userId.value
+    })
+
+    if (response.data.status === true) {
+      redeemHistory.value = response.data.data
+    }
+  } catch (error) {
+    console.error('Error fetching redeem history:', error)
+  } finally {
+    isLoadingHistory.value = false
+  }
+}
+
 // Initialize on mount
 onMounted(() => {
   getUserId()
@@ -60,11 +91,43 @@ onMounted(() => {
 
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
+  // Close history panel when opening menu
+  if (isMenuOpen.value) {
+    isHistoryOpen.value = false
+  }
+}
+
+const toggleHistory = () => {
+  isHistoryOpen.value = !isHistoryOpen.value
+  // Close menu when opening history
+  if (isHistoryOpen.value) {
+    isMenuOpen.value = false
+    if (redeemHistory.value.transactions.length === 0) {
+      fetchRedeemHistory()
+    }
+  }
 }
 
 const _handleNavigate = (route) => {
   isMenuOpen.value = false
   navigateTo(route)
+}
+
+// Format date to Thai format
+const formatDate = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('th-TH', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// Get status badge color
+const getStatusColor = (status) => {
+  return status === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
 }
 </script>
 
@@ -73,7 +136,7 @@ const _handleNavigate = (route) => {
     <!-- Red Header Section -->
     <div class="bg-gradient-to-br from-red-600 via-red-500 to-red-600 relative pb-8">
       <!-- Hamburger Menu Button -->
-      <div class="absolute top-4 right-4 z-50">
+      <div class="fixed top-4 right-4 z-50">
         <button
           @click="toggleMenu"
           class="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-all backdrop-blur-sm"
@@ -176,19 +239,30 @@ const _handleNavigate = (route) => {
                   <h3 class="text-white font-bold text-lg">บัตรสมาชิก</h3>
                 </div>
               </div>
-              <!-- Success Badge (Clickable) -->
-              <button
-                v-if="canRedeem"
-                type="button"
-                class="relative overflow-hidden bg-gradient-to-r from-yellow-400 to-yellow-500 text-red-700 text-xs font-black px-4 py-2 rounded-xl shadow-lg animate-pulse-glow hover:from-yellow-500 hover:to-yellow-600 transition-all cursor-pointer"
-                @click="navigateTo('/redeem')"
-              >
-                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent shimmer"></div>
-                <div class="relative flex items-center gap-1.5">
-                  <span class="text-base">🎉</span>
-                  <span>แลกได้!</span>
-                </div>
-              </button>
+              <div class="flex items-center gap-2">
+                <!-- History Button -->
+                <button
+                  type="button"
+                  class="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-all backdrop-blur-sm"
+                  @click="toggleHistory"
+                  aria-label="ดูประวัติการแลก"
+                >
+                  <UIcon name="i-heroicons-clock" class="text-xl text-white" />
+                </button>
+                <!-- Success Badge (Clickable) -->
+                <button
+                  v-if="canRedeem"
+                  type="button"
+                  class="relative overflow-hidden bg-gradient-to-r from-yellow-400 to-yellow-500 text-red-700 text-xs font-black px-4 py-2 rounded-xl shadow-lg animate-pulse-glow hover:from-yellow-500 hover:to-yellow-600 transition-all cursor-pointer"
+                  @click="navigateTo('/redeem')"
+                >
+                  <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent shimmer"></div>
+                  <div class="relative flex items-center gap-1.5">
+                    <span class="text-base">🎉</span>
+                    <span>แลกได้!</span>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <!-- Cups Display -->
@@ -288,10 +362,123 @@ const _handleNavigate = (route) => {
       leave-to-class="opacity-0"
     >
       <div
-        v-if="isMenuOpen"
-        @click="toggleMenu"
+        v-if="isMenuOpen || isHistoryOpen"
+        @click="isMenuOpen ? toggleMenu() : toggleHistory()"
         class="fixed inset-0 bg-black/50 z-30"
       ></div>
+    </Transition>
+
+    <!-- Redeem History Slide Panel -->
+    <Transition
+      enter-active-class="transition-transform duration-300 ease-out"
+      enter-from-class="translate-x-full"
+      enter-to-class="translate-x-0"
+      leave-active-class="transition-transform duration-300 ease-in"
+      leave-from-class="translate-x-0"
+      leave-to-class="translate-x-full"
+    >
+      <div
+        v-if="isHistoryOpen"
+        class="fixed top-0 right-0 h-full w-full md:w-96 bg-white shadow-2xl z-40 overflow-y-auto"
+      >
+        <!-- History Header -->
+        <div class="sticky top-0 bg-gradient-to-br from-red-600 to-red-500 p-6 text-white shadow-lg z-10">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <UIcon name="i-heroicons-clock" class="text-2xl text-white" />
+              </div>
+              <h2 class="text-xl font-bold">ประวัติการแลก</h2>
+            </div>
+            <button
+              @click="toggleHistory"
+              class="p-2 rounded-lg hover:bg-white/20 transition-all"
+              aria-label="ปิด"
+            >
+              <UIcon name="i-heroicons-x-mark" class="text-2xl text-white" />
+            </button>
+          </div>
+
+          <!-- Current Points Summary -->
+          <div class="bg-white/20 backdrop-blur-sm rounded-xl p-4">
+            <p class="text-white/80 text-sm mb-1">คะแนนปัจจุบัน</p>
+            <div class="flex items-baseline gap-2">
+              <span class="text-3xl font-black text-white">{{ redeemHistory.current_point || memberCups.current }}</span>
+              <span class="text-sm text-white/90">คะแนน</span>
+            </div>
+            <p class="text-white/70 text-xs mt-2">
+              ทั้งหมด {{ redeemHistory.total_transactions }} รายการ
+            </p>
+          </div>
+        </div>
+
+        <!-- History Content -->
+        <div class="p-4">
+          <!-- Loading State -->
+          <div v-if="isLoadingHistory" class="text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+            <p class="text-gray-600 mt-4">กำลังโหลดข้อมูล...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div v-else-if="!redeemHistory.transactions || redeemHistory.transactions.length === 0" class="text-center py-12">
+            <div class="text-6xl mb-4">📜</div>
+            <p class="text-gray-600 font-medium">ยังไม่มีประวัติการแลกรางวัล</p>
+            <p class="text-gray-400 text-sm mt-2">เมื่อคุณแลกรางวัล ประวัติจะแสดงที่นี่</p>
+          </div>
+
+          <!-- Transaction List -->
+          <div v-else class="space-y-3">
+            <div
+              v-for="transaction in redeemHistory.transactions"
+              :key="transaction.id"
+              class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
+            >
+              <!-- Transaction Header -->
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <span class="text-xl">🎁</span>
+                  </div>
+                  <div>
+                    <p class="font-bold text-gray-800">แลกรางวัล</p>
+                    <p class="text-xs text-gray-500">รหัส #{{ transaction.id }}</p>
+                  </div>
+                </div>
+                <span
+                  :class="['text-xs font-bold px-3 py-1 rounded-full', getStatusColor(transaction.status)]"
+                >
+                  {{ transaction.status_text }}
+                </span>
+              </div>
+
+              <!-- Points Used -->
+              <div class="bg-gray-50 rounded-lg p-3 mb-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-600">คะแนนที่ใช้</span>
+                  <div class="flex items-baseline gap-1">
+                    <span class="text-xl font-black text-red-600">-{{ transaction.point_used }}</span>
+                    <span class="text-sm text-gray-600">คะแนน</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Date -->
+              <div class="flex items-center gap-2 text-xs text-gray-500">
+                <UIcon name="i-heroicons-calendar" class="text-sm" />
+                <span>{{ formatDate(transaction.redeemed_at) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- History Footer -->
+        <div class="sticky bottom-0 bg-gray-50 border-t p-4 text-center">
+          <p class="text-xs text-gray-500">
+            รายการแสดงเรียงตามวันที่ล่าสุด
+          </p>
+        </div>
+      </div>
     </Transition>
   </div>
 </template>

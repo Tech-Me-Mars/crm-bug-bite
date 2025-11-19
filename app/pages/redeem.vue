@@ -62,21 +62,40 @@ const checkPoints = async () => {
 
 // Handle redeem
 const handleRedeem = async () => {
+  // Show confirmation dialog
+  const confirmed = confirm(
+    '🎁 ยืนยันการแลกรางวัล\n\n' +
+    'คุณต้องการแลกแมลงทอดฟรี 1 รายการ\n' +
+    'โดยใช้คะแนน 10 คะแนนใช่หรือไม่?\n\n' +
+    '* เมื่อยืนยันแล้วจะไม่สามารถยกเลิกได้'
+  )
+
+  // If user cancels, return without doing anything
+  if (!confirmed) {
+    return
+  }
+
   try {
     isRedeeming.value = true
 
-    // TODO: Call redeem API endpoint
-    // const response = await api.post('/crmbugbite/v1/redeem', {
-    //   userId: userId.value
-    // })
+    // Call redeem API endpoint
+    const response = await api.post('/crmbugbite/v1/redeem', {
+      userId: userId.value
+    })
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    if (response.data.status === true) {
+      // Show success message
+      alert('🎉 แลกรางวัลสำเร็จ!\n\nกรุณาแสดงหน้านี้กับพนักงานเพื่อรับแมลงทอดฟรี')
 
-    // After successful redeem, redirect to member page
-    navigateTo('/member', { replace: true })
+      // After successful redeem, redirect to member page
+      navigateTo('/member', { replace: true })
+    } else {
+      console.error('Redeem failed:', response.data.message)
+      alert(response.data.message || 'การแลกรางวัลล้มเหลว กรุณาลองใหม่อีกครั้ง')
+    }
   } catch (error) {
     console.error('Error redeeming:', error)
+    alert('เกิดข้อผิดพลาดในการแลกรางวัล กรุณาลองใหม่อีกครั้ง')
   } finally {
     isRedeeming.value = false
   }
