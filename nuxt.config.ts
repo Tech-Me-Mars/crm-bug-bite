@@ -11,7 +11,12 @@ export default defineNuxtConfig({
       apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:8000/api',
       apiTimeout: process.env.API_TIMEOUT || '30000',
       appName: process.env.APP_NAME || 'Bug Bite CRM',
-      appUrl: process.env.APP_URL || 'http://localhost:3000'
+      appUrl: process.env.APP_URL || 'http://localhost:3000',
+      liffId: process.env.LIFF_ID || '',
+      contactPhone: process.env.CONTACT_PHONE || '02-XXX-XXXX',
+      contactMobile: process.env.CONTACT_MOBILE || '081-XXX-XXXX',
+      contactAddress: process.env.CONTACT_ADDRESS || '',
+      businessHours: process.env.BUSINESS_HOURS || 'เปิดทุกวัน 10:00 - 20:00'
     }
   },
 
@@ -40,5 +45,20 @@ export default defineNuxtConfig({
         'neutral'
       ]
     }
+  },
+
+  // Vite configuration - Allow external hosts (for tunnels like ngrok, cloudflare)
+  vite: {
+    server: {
+      hmr: {
+        clientPort: process.env.HMR_CLIENT_PORT ? parseInt(process.env.HMR_CLIENT_PORT) : undefined
+      }
+    }
+  },
+
+  // Development server configuration
+  devServer: {
+    host: '0.0.0.0', // Allow external access
+    port: 3000
   }
 })

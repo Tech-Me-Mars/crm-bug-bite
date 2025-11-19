@@ -3,8 +3,11 @@ import { ref, computed } from 'vue'
 
 // Disable default layout for this page
 definePageMeta({
-  layout: false
+  layout: false,
+  middleware: 'auth' // Require authentication
 })
+
+const config = useRuntimeConfig()
 
 // Menu state
 const isMenuOpen = ref(false)
@@ -362,8 +365,8 @@ const handlePhoneInput = (event) => {
         <!-- Menu Footer -->
         <div class="absolute bottom-0 left-0 right-0 p-6 bg-gray-50 border-t">
           <div class="text-center space-y-2">
-            <p class="text-sm text-gray-600">เปิดทุกวัน 10:00 - 20:00</p>
-            <p class="text-xs text-gray-500">โทร: 02-XXX-XXXX</p>
+            <p class="text-sm text-gray-600">{{ config.public.businessHours }}</p>
+            <p class="text-xs text-gray-500">โทร: {{ config.public.contactPhone }}</p>
           </div>
         </div>
       </div>

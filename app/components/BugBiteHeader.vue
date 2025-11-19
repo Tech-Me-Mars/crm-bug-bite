@@ -1,6 +1,9 @@
 <script setup>
 import { ref } from 'vue'
 
+const config = useRuntimeConfig()
+const api = useApi()
+
 const isMenuOpen = ref(false)
 
 const menuItems = [
@@ -11,24 +14,49 @@ const menuItems = [
 
 // Member Cups Data (พร้อมรับข้อมูลจาก API)
 const memberCups = ref({
-  current: 10, // จำนวนแก้วปัจจุบัน
+  current: 0, // จำนวนแก้วปัจจุบัน (ดึงจาก API)
   target: 10  // เป้าหมาย 10 แก้ว
 })
+
+// User ID
+const userId = ref('')
+
+// Get userId from localStorage
+const getUserId = () => {
+  if (import.meta.client) {
+    const userInfo = localStorage.getItem('user_info')
+    if (userInfo) {
+      const user = JSON.parse(userInfo)
+      userId.value = user.userId || ''
+    }
+  }
+}
 
 // Check if member can redeem (ครบ 10 แก้ว)
 const canRedeem = computed(() => memberCups.value.current >= memberCups.value.target)
 
-// Fetch member cups from API
-const _fetchMemberCups = async () => {
+// Fetch member cups (point) from API
+const fetchMemberCups = async () => {
   try {
-    // TODO: Replace with actual API call
-    // const response = await request('GET', '/api/member/cups', null, true)
-    // memberCups.value = response.data
-    console.log('Fetched member cups')
+    if (!userId.value) return
+
+    const response = await api.post('/crmbugbite/v1/point', {
+      userId: userId.value
+    })
+
+    if (response.data.status === true) {
+      memberCups.value.current = Number(response.data.data.point || '0')
+    }
   } catch (error) {
     console.error('Error fetching member cups:', error)
   }
 }
+
+// Initialize on mount
+onMounted(() => {
+  getUserId()
+  fetchMemberCups()
+})
 
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
@@ -148,22 +176,19 @@ const _handleNavigate = (route) => {
                   <h3 class="text-white font-bold text-lg">บัตรสมาชิก</h3>
                 </div>
               </div>
-              <div class="flex items-center gap-2">
-                <!-- Success Badge -->
-                <div
-                  v-if="canRedeem"
-                  class="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse"
-                >
-                  ✓ แลกได้
+              <!-- Success Badge (Clickable) -->
+              <button
+                v-if="canRedeem"
+                type="button"
+                class="relative overflow-hidden bg-gradient-to-r from-yellow-400 to-yellow-500 text-red-700 text-xs font-black px-4 py-2 rounded-xl shadow-lg animate-pulse-glow hover:from-yellow-500 hover:to-yellow-600 transition-all cursor-pointer"
+                @click="navigateTo('/redeem')"
+              >
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent shimmer"></div>
+                <div class="relative flex items-center gap-1.5">
+                  <span class="text-base">🎉</span>
+                  <span>แลกได้!</span>
                 </div>
-                <NuxtLink
-                  to="/member/points"
-                  class="text-white/90 hover:text-white text-sm font-medium flex items-center gap-1 transition-colors"
-                >
-                  รายละเอียด
-                  <span class="text-lg">›</span>
-                </NuxtLink>
-              </div>
+              </button>
             </div>
 
             <!-- Cups Display -->
@@ -246,8 +271,8 @@ const _handleNavigate = (route) => {
         <!-- Menu Footer -->
         <div class="absolute bottom-0 left-0 right-0 p-6 bg-gray-50 border-t">
           <div class="text-center space-y-2">
-            <p class="text-sm text-gray-600">เปิดทุกวัน 10:00 - 20:00</p>
-            <p class="text-xs text-gray-500">โทร: 02-XXX-XXXX</p>
+            <p class="text-sm text-gray-600">{{ config.public.businessHours }}</p>
+            <p class="text-xs text-gray-500">โทร: {{ config.public.contactPhone }}</p>
           </div>
         </div>
       </div>
@@ -291,5 +316,35 @@ nav ul li a {
 
 nav ul li a:active {
   transform: scale(0.98);
+}
+
+/* Shimmer effect for redeemable badge */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.shimmer {
+  animation: shimmer 3s infinite;
+}
+
+/* Pulse glow animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(250, 204, 21, 0.5), 0 0 40px rgba(250, 204, 21, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(250, 204, 21, 0.8), 0 0 60px rgba(250, 204, 21, 0.5);
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 </style>

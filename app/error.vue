@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { NuxtError } from '#app'
 
+const config = useRuntimeConfig()
+
 const props = defineProps({
   error: Object as () => NuxtError,
 })
@@ -77,30 +79,7 @@ const handleGoBack = () => {
             </button>
           </div>
 
-          <!-- Helpful Links -->
-          <div class="mt-8 pt-8 border-t border-gray-200">
-            <p class="text-sm text-gray-600 mb-4">ลิงก์ที่อาจเป็นประโยชน์:</p>
-            <div class="flex flex-wrap justify-center gap-4">
-              <NuxtLink
-                to="/member"
-                class="text-sm text-red-600 hover:text-red-700 font-medium hover:underline"
-              >
-                หน้าสมาชิก
-              </NuxtLink>
-              <NuxtLink
-                to="/profile"
-                class="text-sm text-red-600 hover:text-red-700 font-medium hover:underline"
-              >
-                โปรไฟล์
-              </NuxtLink>
-              <NuxtLink
-                to="/orders"
-                class="text-sm text-red-600 hover:text-red-700 font-medium hover:underline"
-              >
-                ประวัติการสั่งซื้อ
-              </NuxtLink>
-            </div>
-          </div>
+         
         </div>
       </div>
 
@@ -110,7 +89,7 @@ const handleGoBack = () => {
           หากปัญหายังคงอยู่ กรุณาติดต่อเรา
         </p>
         <p class="text-xs text-gray-500 mt-2">
-          โทร: 02-XXX-XXXX | เปิดทุกวัน 10:00 - 20:00
+          โทร: {{ config.public.contactPhone }} | {{ config.public.businessHours }}
         </p>
       </div>
     </div>

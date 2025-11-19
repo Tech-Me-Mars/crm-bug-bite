@@ -16,10 +16,12 @@ const createApiInstance = (): AxiosInstance => {
   // Request interceptor
   instance.interceptors.request.use(
     (config) => {
-      // Add auth token if exists
-      const token = useCookie('auth_token')
-      if (token.value) {
-        config.headers.Authorization = `Bearer ${token.value}`
+      // Add auth token from localStorage if exists
+      if (import.meta.client) {
+        const token = localStorage.getItem('token')
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`
+        }
       }
 
       // Add timestamp to prevent caching
@@ -48,10 +50,14 @@ const createApiInstance = (): AxiosInstance => {
 
         switch (status) {
           case 401:
-            // Unauthorized - clear token and redirect to login
-            const token = useCookie('auth_token')
-            token.value = null
-            navigateTo('/register')
+            // Unauthorized - clear all data from localStorage and redirect to index
+            if (import.meta.client) {
+              localStorage.removeItem('token')
+              localStorage.removeItem('user_info')
+              localStorage.removeItem('customer_data')
+              localStorage.removeItem('line_profile')
+            }
+            navigateTo('/', { replace: true })
             break
           case 403:
             // Forbidden

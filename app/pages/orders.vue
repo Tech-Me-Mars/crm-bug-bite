@@ -3,8 +3,12 @@ import { ref, computed } from 'vue'
 
 // Disable default layout for this page
 definePageMeta({
-  layout: false
+  layout: false,
+  middleware: 'auth' // Require authentication
 })
+
+const config = useRuntimeConfig()
+const api = useApi()
 
 // Menu state
 const isMenuOpen = ref(false)
@@ -19,64 +23,37 @@ const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
 }
 
-// Order history data (พร้อมรับข้อมูลจาก API)
-const orders = ref([
-  {
-    id: 'ORD-001',
-    date: '2024-11-15',
-    items: [
-      { name: 'ตัวสาคุทอด', quantity: 2, price: 50 },
-      { name: 'หนอนไหมทอด', quantity: 1, price: 60 }
-    ],
-    total: 160,
-    cupsEarned: 2,
-    status: 'completed'
-  },
-  {
-    id: 'ORD-002',
-    date: '2024-11-10',
-    items: [
-      { name: 'จิ้งหรีดทอด', quantity: 3, price: 45 }
-    ],
-    total: 135,
-    cupsEarned: 3,
-    status: 'completed'
-  },
-  {
-    id: 'ORD-003',
-    date: '2024-11-05',
-    items: [
-      { name: 'แมลงวันทอด', quantity: 1, price: 40 },
-      { name: 'ตั๊กแตนทอด', quantity: 2, price: 55 }
-    ],
-    total: 150,
-    cupsEarned: 3,
-    status: 'completed'
+// User ID
+const userId = ref('')
+
+// Get userId from localStorage
+const getUserId = () => {
+  if (import.meta.client) {
+    const userInfo = localStorage.getItem('user_info')
+    if (userInfo) {
+      const user = JSON.parse(userInfo)
+      userId.value = user.userId || ''
+    }
   }
-])
+}
+
+// Order history data
+const orders = ref([])
+const summary = ref({
+  total_orders: 0,
+  total_items: 0,
+  total_amount: 0
+})
 
 // Loading state
 const isLoading = ref(false)
 
-// Filter state
-const selectedFilter = ref('all') // all, completed, pending
+// Filtered orders (ตอนนี้แสดงทั้งหมด)
+const filteredOrders = computed(() => orders.value)
 
-// Filtered orders
-const filteredOrders = computed(() => {
-  if (selectedFilter.value === 'all') {
-    return orders.value
-  }
-  return orders.value.filter(order => order.status === selectedFilter.value)
-})
-
-// Total stats
-const totalOrders = computed(() => orders.value.length)
-const totalCupsEarned = computed(() => {
-  return orders.value.reduce((sum, order) => sum + order.cupsEarned, 0)
-})
-const totalSpent = computed(() => {
-  return orders.value.reduce((sum, order) => sum + order.total, 0)
-})
+// Total stats from API
+const totalOrders = computed(() => summary.value.total_orders)
+const totalItems = computed(() => summary.value.total_items)
 
 // Format date
 const formatDate = (dateString) => {
@@ -84,34 +61,53 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString('th-TH', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   })
 }
 
 // Get status text and color
 const getStatusInfo = (status) => {
   const statusMap = {
-    completed: { text: 'สำเร็จ', color: 'bg-green-100 text-green-700' },
-    pending: { text: 'รอดำเนินการ', color: 'bg-yellow-100 text-yellow-700' },
-    cancelled: { text: 'ยกเลิก', color: 'bg-red-100 text-red-700' }
+    0: { text: 'รอดำเนินการ', color: 'bg-yellow-100 text-yellow-700' },
+    1: { text: 'สำเร็จ', color: 'bg-green-100 text-green-700' },
+    2: { text: 'ยกเลิก', color: 'bg-red-100 text-red-700' }
   }
-  return statusMap[status] || statusMap.completed
+  return statusMap[status] || statusMap[1]
 }
 
 // Fetch orders from API
-const _fetchOrders = async () => {
-  isLoading.value = true
+const fetchOrders = async () => {
   try {
-    // TODO: Replace with actual API call
-    // const response = await request('GET', '/api/orders', null, true)
-    // orders.value = response.data
-    console.log('Fetched orders')
+    if (!userId.value) return
+
+    isLoading.value = true
+
+    const response = await api.post('/crmbugbite/v1/order/history', {
+      userId: userId.value
+    })
+
+    if (response.data.status === true) {
+      summary.value = response.data.data.summary || {
+        total_orders: 0,
+        total_items: 0,
+        total_amount: 0
+      }
+      orders.value = response.data.data.orders || []
+    }
   } catch (error) {
     console.error('Error fetching orders:', error)
   } finally {
     isLoading.value = false
   }
 }
+
+// Initialize on mount
+onMounted(() => {
+  getUserId()
+  fetchOrders()
+})
 </script>
 
 <template>
@@ -206,28 +202,27 @@ const _fetchOrders = async () => {
         </div>
 
         <!-- Summary Stats -->
-        <div class="grid grid-cols-3 gap-3 mb-6">
+        <div class="grid grid-cols-2 gap-3 mb-6">
           <!-- Total Orders -->
           <div class="bg-white rounded-xl p-4 shadow-md text-center">
             <p class="text-2xl font-bold text-red-600">{{ totalOrders }}</p>
             <p class="text-xs text-gray-600 mt-1">คำสั่งซื้อ</p>
           </div>
 
-          <!-- Total Cups -->
+          <!-- Total Items -->
           <div class="bg-white rounded-xl p-4 shadow-md text-center">
-            <p class="text-2xl font-bold text-orange-600">{{ totalCupsEarned }}</p>
-            <p class="text-xs text-gray-600 mt-1">แก้วสะสม</p>
-          </div>
-
-          <!-- Total Spent -->
-          <div class="bg-white rounded-xl p-4 shadow-md text-center">
-            <p class="text-2xl font-bold text-green-600">{{ totalSpent }}</p>
-            <p class="text-xs text-gray-600 mt-1">บาท</p>
+            <p class="text-2xl font-bold text-orange-600">{{ totalItems }}</p>
+            <p class="text-xs text-gray-600 mt-1">รายการ</p>
           </div>
         </div>
 
+        <!-- Loading State -->
+        <div v-if="isLoading" class="flex justify-center py-12">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600" />
+        </div>
+
         <!-- Orders List -->
-        <div class="space-y-4">
+        <div v-else class="space-y-4">
           <div
             v-for="order in filteredOrders"
             :key="order.id"
@@ -237,8 +232,8 @@ const _fetchOrders = async () => {
             <div class="bg-gradient-to-r from-red-50 to-orange-50 p-4 border-b border-red-100">
               <div class="flex justify-between items-start">
                 <div>
-                  <p class="font-semibold text-gray-800">{{ order.id }}</p>
-                  <p class="text-xs text-gray-600 mt-1">{{ formatDate(order.date) }}</p>
+                  <p class="font-semibold text-gray-800">{{ order.sale_number }}</p>
+                  <p class="text-xs text-gray-600 mt-1">{{ formatDate(order.sale_date) }}</p>
                 </div>
                 <span
                   class="px-3 py-1 rounded-full text-xs font-semibold"
@@ -251,32 +246,15 @@ const _fetchOrders = async () => {
 
             <!-- Order Items -->
             <div class="p-4">
-              <div class="space-y-2 mb-3">
+              <div class="space-y-2">
                 <div
-                  v-for="(item, idx) in order.items"
+                  v-for="(item, idx) in order.sale_details"
                   :key="idx"
-                  class="flex justify-between text-sm"
+                  class="text-sm"
                 >
                   <span class="text-gray-700">
-                    {{ item.name }} x{{ item.quantity }}
+                    {{ item.product_name }} x{{ item.qty }}
                   </span>
-                  <span class="text-gray-900 font-semibold">
-                    {{ item.price * item.quantity }} ฿
-                  </span>
-                </div>
-              </div>
-
-              <!-- Order Total -->
-              <div class="border-t pt-3 flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                  <span class="text-2xl">🥤</span>
-                  <span class="text-sm text-gray-600">
-                    +{{ order.cupsEarned }} แก้ว
-                  </span>
-                </div>
-                <div class="text-right">
-                  <p class="text-xs text-gray-500">ยอดรวม</p>
-                  <p class="text-xl font-bold text-red-600">{{ order.total }} ฿</p>
                 </div>
               </div>
             </div>
@@ -365,8 +343,8 @@ const _fetchOrders = async () => {
         <!-- Menu Footer -->
         <div class="absolute bottom-0 left-0 right-0 p-6 bg-gray-50 border-t">
           <div class="text-center space-y-2">
-            <p class="text-sm text-gray-600">เปิดทุกวัน 10:00 - 20:00</p>
-            <p class="text-xs text-gray-500">โทร: 02-XXX-XXXX</p>
+            <p class="text-sm text-gray-600">{{ config.public.businessHours }}</p>
+            <p class="text-xs text-gray-500">โทร: {{ config.public.contactPhone }}</p>
           </div>
         </div>
       </div>

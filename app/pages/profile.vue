@@ -3,8 +3,11 @@ import { ref } from 'vue'
 
 // Disable default layout for this page
 definePageMeta({
-  layout: false
+  layout: false,
+  middleware: 'auth' // Require authentication
 })
+
+const config = useRuntimeConfig()
 
 // Menu state
 const isMenuOpen = ref(false)
@@ -19,39 +22,190 @@ const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
 }
 
-// User profile data (พร้อมรับข้อมูลจาก API)
-const userProfile = ref({
-  fullName: 'สมชาย ใจดี',
-  phoneNumber: '081-234-5678',
-  accumulatedCups: 8,
-  memberSince: '2024-01-15',
-  totalOrders: 23
+// Get user data from localStorage
+const getUserData = () => {
+  if (import.meta.client) {
+    const userInfo = localStorage.getItem('user_info')
+    const customerData = localStorage.getItem('customer_data')
+
+    if (userInfo && customerData) {
+      const user = JSON.parse(userInfo)
+      const customer = JSON.parse(customerData)
+
+      return {
+        fullName: customer.fullname || user.displayName || 'ไม่ระบุ',
+        phoneNumber: customer.phone_no || 'ไม่ระบุ',
+        pictureUrl: user.pictureUrl || '',
+        userId: user.userId || '',
+        displayName: user.displayName || '',
+        accumulatedCups: Number(customer.point || user.point || '0'), // Point = แก้วสะสม
+        memberSince: customer.created_at || user.created_at || null, // สมาชิกตั้งแต่
+        totalOrders: 23 // TODO: Get from API
+      }
+    }
+  }
+
+  return {
+    fullName: 'ไม่ระบุ',
+    phoneNumber: 'ไม่ระบุ',
+    pictureUrl: '',
+    userId: '',
+    displayName: '',
+    accumulatedCups: 0, // Point = แก้วสะสม
+    memberSince: null,
+    totalOrders: 0
+  }
+}
+
+// User profile data
+const userProfile = ref(getUserData())
+
+// Toast notification
+const toast = ref({
+  show: false,
+  message: '',
+  type: 'success' // 'success' | 'error' | 'warning'
 })
 
-// Loading state
-const isLoading = ref(false)
+const showToast = (message, type = 'success') => {
+  toast.value = {
+    show: true,
+    message,
+    type
+  }
+  // Auto hide after 3 seconds
+  setTimeout(() => {
+    toast.value.show = false
+  }, 3000)
+}
 
-// Fetch user profile from API
-const _fetchUserProfile = async () => {
-  isLoading.value = true
+// Fetch accumulated cups (point) from API
+const fetchAccumulatedCups = async () => {
   try {
-    // TODO: Replace with actual API call
-    // const response = await request('GET', '/api/profile', null, true)
-    // userProfile.value = response.data
-    console.log('Fetched user profile')
+    const api = useApi()
+    const response = await api.post('/crmbugbite/v1/point', {
+      userId: userProfile.value.userId
+    })
+
+    if (response.data.status === true) {
+      userProfile.value.accumulatedCups = Number(response.data.data.point || '0')
+    }
   } catch (error) {
-    console.error('Error fetching user profile:', error)
+    console.error('Error fetching accumulated cups:', error)
+  }
+}
+
+// Fetch order count from API
+const fetchOrderCount = async () => {
+  try {
+    const api = useApi()
+    const response = await api.post('/crmbugbite/v1/order/count', {
+      userId: userProfile.value.userId
+    })
+
+    if (response.data.status === true) {
+      userProfile.value.totalOrders = response.data.data.order_count || 0
+    }
+  } catch (error) {
+    console.error('Error fetching order count:', error)
+  }
+}
+
+// Refresh profile data
+const refreshProfile = () => {
+  userProfile.value = getUserData()
+  fetchAccumulatedCups() // Fetch accumulated cups after refresh
+  fetchOrderCount() // Fetch order count after refresh
+}
+
+// Fetch data on mount
+onMounted(() => {
+  fetchAccumulatedCups()
+  fetchOrderCount()
+})
+
+// Edit profile modal
+const isEditModalOpen = ref(false)
+const editForm = ref({
+  fullName: '',
+  phoneNumber: ''
+})
+const isSaving = ref(false)
+
+// Open edit modal
+const openEditModal = () => {
+  editForm.value = {
+    fullName: userProfile.value.fullName,
+    phoneNumber: userProfile.value.phoneNumber
+  }
+  isEditModalOpen.value = true
+}
+
+// Close edit modal
+const closeEditModal = () => {
+  isEditModalOpen.value = false
+}
+
+// Save profile changes
+const saveProfile = async () => {
+  if (!editForm.value.fullName.trim()) {
+    showToast('กรุณากรอกชื่อ-นามสกุล', 'warning')
+    return
+  }
+
+  isSaving.value = true
+  try {
+    const api = useApi()
+
+    // Call API to update profile
+    const response = await api.post('/crmbugbite/v1/profile/update', {
+      userId: userProfile.value.userId,
+      fullname: editForm.value.fullName
+    })
+
+    // Check response status
+    if (response.data.status === true) {
+      // Update localStorage
+      if (import.meta.client) {
+        const customerData = JSON.parse(localStorage.getItem('customer_data') || '{}')
+        customerData.fullname = response.data.data.fullname
+        localStorage.setItem('customer_data', JSON.stringify(customerData))
+
+        const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}')
+        userInfo.fullname = response.data.data.fullname
+        localStorage.setItem('user_info', JSON.stringify(userInfo))
+      }
+
+      // Refresh profile data
+      refreshProfile()
+
+      // Close modal
+      closeEditModal()
+
+      showToast(response.data.message || 'บันทึกข้อมูลสำเร็จ', 'success')
+    } else {
+      showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error')
+    }
+  } catch (error) {
+    console.error('Error saving profile:', error)
+    showToast(error.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error')
   } finally {
-    isLoading.value = false
+    isSaving.value = false
   }
 }
 
 // Handle logout
 const handleLogout = () => {
   if (confirm('คุณต้องการออกจากระบบหรือไม่?')) {
-    // TODO: Clear user session
+    // Clear all data from localStorage
+    if (import.meta.client) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user_info')
+      localStorage.removeItem('customer_data')
+      localStorage.removeItem('line_profile')
+    }
     console.log('Logging out...')
-    navigateTo('/')
+    navigateTo('/', { replace: true })
   }
 }
 
@@ -160,13 +314,19 @@ const formatDate = (dateString) => {
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
           <!-- Profile Header -->
           <div class="bg-gradient-to-r from-red-500 to-red-600 p-6 text-center">
-            <div class="w-24 h-24 bg-white rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg">
-              <span class="text-5xl">👤</span>
+            <div class="w-24 h-24 bg-white rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg overflow-hidden">
+              <img
+                v-if="userProfile.pictureUrl"
+                :src="userProfile.pictureUrl"
+                :alt="userProfile.fullName"
+                class="w-full h-full object-cover"
+              >
+              <span v-else class="text-5xl">👤</span>
             </div>
             <h2 class="text-2xl font-bold text-white mb-1">
               {{ userProfile.fullName }}
             </h2>
-            <p class="text-white/90 text-sm">
+            <p v-if="userProfile.memberSince" class="text-white/90 text-sm">
               สมาชิกตั้งแต่ {{ formatDate(userProfile.memberSince) }}
             </p>
           </div>
@@ -186,7 +346,7 @@ const formatDate = (dateString) => {
               </div>
             </div>
 
-            <!-- Accumulated Cups -->
+            <!-- Accumulated Cups (จาก point) -->
             <div class="flex items-center gap-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl border-2 border-red-200">
               <div class="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
                 <span class="text-2xl">🥤</span>
@@ -226,12 +386,13 @@ const formatDate = (dateString) => {
         <!-- Action Buttons -->
         <div class="space-y-3">
           <!-- Edit Profile Button -->
-          <NuxtLink
-            to="/profile/edit"
-            class="block w-full bg-white text-gray-800 font-semibold py-4 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 text-center border-2 border-gray-200 hover:border-red-500"
+          <button
+            type="button"
+            class="w-full bg-white text-gray-800 font-semibold py-4 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 text-center border-2 border-gray-200 hover:border-red-500"
+            @click="openEditModal"
           >
             ✏️ แก้ไขข้อมูลส่วนตัว
-          </NuxtLink>
+          </button>
 
           <!-- Order History Button -->
           <NuxtLink
@@ -262,6 +423,92 @@ const formatDate = (dateString) => {
 
     <!-- Bottom Navigation Footer -->
     <BugBiteFooter />
+
+    <!-- Edit Profile Modal -->
+    <Transition
+      enter-active-class="transition-opacity duration-300"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-300"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="isEditModalOpen"
+        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        @click.self="closeEditModal"
+      >
+        <div
+          class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+          @click.stop
+        >
+          <!-- Modal Header -->
+          <div class="bg-gradient-to-r from-red-500 to-red-600 p-6 text-white">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xl font-bold">แก้ไขข้อมูลส่วนตัว</h3>
+              <button
+                type="button"
+                class="text-white/80 hover:text-white"
+                @click="closeEditModal"
+              >
+                <span class="text-2xl">×</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Modal Body -->
+          <div class="p-6 space-y-4">
+            <!-- Full Name Field (Editable) -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                ชื่อ-นามสกุล <span class="text-red-500">*</span>
+              </label>
+              <input
+                v-model="editForm.fullName"
+                type="text"
+                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none transition-colors"
+                placeholder="กรอกชื่อ-นามสกุล"
+              >
+            </div>
+
+            <!-- Phone Number Field (Readonly) -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                เบอร์โทรศัพท์
+              </label>
+              <input
+                v-model="editForm.phoneNumber"
+                type="text"
+                readonly
+                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-100 text-gray-600 cursor-not-allowed"
+              >
+              <p class="text-xs text-gray-500 mt-1">
+                ไม่สามารถแก้ไขเบอร์โทรศัพท์ได้
+              </p>
+            </div>
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="p-6 bg-gray-50 flex gap-3">
+            <button
+              type="button"
+              class="flex-1 px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-300 transition-colors"
+              @click="closeEditModal"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              class="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-xl hover:from-red-600 hover:to-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="isSaving"
+              @click="saveProfile"
+            >
+              {{ isSaving ? 'กำลังบันทึก...' : 'บันทึก' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Navigation Slide Menu -->
     <Transition
@@ -317,8 +564,8 @@ const formatDate = (dateString) => {
         <!-- Menu Footer -->
         <div class="absolute bottom-0 left-0 right-0 p-6 bg-gray-50 border-t">
           <div class="text-center space-y-2">
-            <p class="text-sm text-gray-600">เปิดทุกวัน 10:00 - 20:00</p>
-            <p class="text-xs text-gray-500">โทร: 02-XXX-XXXX</p>
+            <p class="text-sm text-gray-600">{{ config.public.businessHours }}</p>
+            <p class="text-xs text-gray-500">โทร: {{ config.public.contactPhone }}</p>
           </div>
         </div>
       </div>
@@ -338,6 +585,51 @@ const formatDate = (dateString) => {
         class="fixed inset-0 bg-black/50 z-30"
         @click="toggleMenu"
       />
+    </Transition>
+
+    <!-- Toast Notification -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out"
+      enter-from-class="translate-y-2 opacity-0"
+      enter-to-class="translate-y-0 opacity-100"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="translate-y-0 opacity-100"
+      leave-to-class="-translate-y-2 opacity-0"
+    >
+      <div
+        v-if="toast.show"
+        class="fixed top-4 left-1/2 transform -translate-x-1/2 z-[60] w-full max-w-md px-4"
+      >
+        <div
+          :class="[
+            'rounded-xl shadow-2xl p-4 flex items-center gap-3',
+            toast.type === 'success' ? 'bg-green-500 text-white' :
+            toast.type === 'error' ? 'bg-red-500 text-white' :
+            'bg-yellow-500 text-white'
+          ]"
+        >
+          <!-- Icon -->
+          <div class="flex-shrink-0">
+            <span v-if="toast.type === 'success'" class="text-2xl">✓</span>
+            <span v-else-if="toast.type === 'error'" class="text-2xl">✕</span>
+            <span v-else class="text-2xl">⚠</span>
+          </div>
+
+          <!-- Message -->
+          <div class="flex-1 font-medium">
+            {{ toast.message }}
+          </div>
+
+          <!-- Close Button -->
+          <button
+            type="button"
+            class="flex-shrink-0 text-white/80 hover:text-white"
+            @click="toast.show = false"
+          >
+            <span class="text-xl">×</span>
+          </button>
+        </div>
+      </div>
     </Transition>
   </div>
 </template>
